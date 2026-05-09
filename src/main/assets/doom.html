@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <style>
+        html, body {
+          margin: 0; padding: 0;
+          background: #000;
+          overflow: hidden;
+          width: 100%; height: 100%;
+          font-family: monospace;
+          color: #ff6633;
+        }
+        #jsdos {
+          width: 100vw !important;
+          height: 100vh !important;
+          display: block;
+          image-rendering: pixelated;
+        }
+        #status {
+          position: fixed; top: 8px; left: 8px;
+          z-index: 1000;
+          font-size: 13px;
+          text-shadow: 0 0 4px #000;
+          pointer-events: none;
+        }
+        .dosbox-start, .dosbox-powered, .dosbox-overlay { display: none !important; }
+    </style>
+</head>
+<body>
+<div id="status">DOOM: starting...</div>
+<canvas id="jsdos"></canvas>
+
+<script>
+    var statusEl = document.getElementById("status");
+    function setStatus(m) { console.log("[doom] " + m); if (statusEl) statusEl.textContent = "DOOM: " + m; }
+    function clearStatus() { if (statusEl) statusEl.style.display = "none"; }
+    window.onerror = function (msg) { setStatus("ERROR: " + msg); };
+    setStatus("loading engine...");
+</script>
+
+<!-- All paths are now relative — files come from the same assets folder -->
+<script src="js-dos.js"
+        onerror="setStatus('FAILED to load js-dos.js')"
+        onload="setStatus('engine loaded, booting DOSBox...')"></script>
+
+<script>
+    if (typeof Dos === "function") {
+      Dos(document.getElementById("jsdos"), {
+        wdosboxUrl: "wdosbox.js",
+        cycles: "auto",
+        autolock: false
+      }).ready(function (fs, main) {
+        setStatus("loading WAD...");
+        fs.extract("doom.zip")
+          .then(function () {
+            setStatus("starting DOOM...");
+            return main([
+              "-c", "config -set \"render frameskip=2\"",
+              "-c", "cd DOOM",
+              "-c", "DOOM.EXE"
+            ]);
+          })
+          .then(function (ci) {
+            window.ci = ci;
+            setTimeout(clearStatus, 2500);
+          })
+          .catch(function (e) {
+            setStatus("FAIL: " + (e && e.message ? e.message : JSON.stringify(e)));
+          });
+      });
+    } else {
+      setStatus("Dos() not defined");
+    }
+
+    function dispatchKey(keyCode, isDown) {
+      if (window.ci) window.ci.simulateKeyEvent(keyCode, isDown);
+    }
+</script>
+
+<!--<div id="dbg" style="position:fixed;top:4px;right:4px;font-family:monospace;-->
+<!--     font-size:11px;color:#0f0;background:rgba(0,0,0,0.75);padding:4px;-->
+<!--     max-width:60%;z-index:9999;pointer-events:none;white-space:pre"></div>-->
+<!--<script>-->
+<!--    (function () {-->
+<!--      var dbgEl = document.getElementById("dbg");-->
+<!--      var lines = [];-->
+<!--      function dbg(s) {-->
+<!--        lines.push(s);-->
+<!--        if (lines.length > 12) lines.shift();-->
+<!--        dbgEl.textContent = lines.join("\n");-->
+<!--      }-->
+
+<!--      // Wrap dispatchKey to log every call from Kotlin -> JS.-->
+<!--      var origK = window.dispatchKey;-->
+<!--      window.dispatchKey = function (kc, down) {-->
+<!--        dbg("OUT key " + kc + " " + (down ? "DOWN" : "UP"));-->
+<!--        return origK(kc, down);-->
+<!--      };-->
+
+<!--      // Wrap dispatchMouse if you kept it.-->
+<!--      if (window.dispatchMouse) {-->
+<!--        var origM = window.dispatchMouse;-->
+<!--        window.dispatchMouse = function (down) {-->
+<!--          dbg("OUT mouse btn0 " + (down ? "DOWN" : "UP"));-->
+<!--          return origM(down);-->
+<!--        };-->
+<!--      }-->
+
+<!--      // Listen on document — confirms the synthetic event was dispatched.-->
+<!--      document.addEventListener("keydown", function (e) {-->
+<!--        dbg("DOC kd " + e.keyCode +-->
+<!--            (e.ctrlKey  ? " +ctrl"  : "") +-->
+<!--            (e.shiftKey ? " +shift" : "") +-->
+<!--            (e.altKey   ? " +alt"   : ""));-->
+<!--      }, true);-->
+<!--      document.addEventListener("keyup", function (e) {-->
+<!--        dbg("DOC ku " + e.keyCode);-->
+<!--      }, true);-->
+
+<!--      // Listen on the Doom canvas — confirms events reach the emulator surface.-->
+<!--      function watchCanvas() {-->
+<!--        var c = document.querySelector("canvas");-->
+<!--        if (!c) { setTimeout(watchCanvas, 500); return; }-->
+<!--        c.addEventListener("keydown",   function (e) { dbg("CNV kd " + e.keyCode);  }, true);-->
+<!--        c.addEventListener("keyup",     function (e) { dbg("CNV ku " + e.keyCode);  }, true);-->
+<!--        c.addEventListener("mousedown", function (e) { dbg("CNV md btn" + e.button); }, true);-->
+<!--        c.addEventListener("mouseup",   function (e) { dbg("CNV mu btn" + e.button); }, true);-->
+<!--        dbg("&#45;&#45; canvas ready &#45;&#45;");-->
+<!--      }-->
+<!--      watchCanvas();-->
+
+<!--      dbg("&#45;&#45; debug ready &#45;&#45;");-->
+<!--    })();-->
+<!--</script>-->
+</body>
+</html>
